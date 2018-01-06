@@ -1,3 +1,5 @@
+// TexturedQuad.js (c) 2012 matsuda and kanda
+// Vertex shader program
 var VSHADER_SOURCE =
   'attribute vec4 a_Position;\n' +
   'attribute vec2 a_TexCoord;\n' +
@@ -7,34 +9,42 @@ var VSHADER_SOURCE =
   '  v_TexCoord = a_TexCoord;\n' +
   '}\n';
 
+// Fragment shader program
 var FSHADER_SOURCE =
+  '#ifdef GL_ES\n' +
   'precision mediump float;\n' +
-  'uniform sampler2D u_Sampler0;\n' +
-  'uniform sampler2D u_Sampler1;\n'+
+  '#endif\n' +
+  'uniform sampler2D u_Sampler;\n' +
   'varying vec2 v_TexCoord;\n' +
   'void main() {\n' +
-  ' vec4 color0 = texture2D(u_Sampler0, v_TexCoord);\n' +
-  ' vec4 color1 = texture2D(u_Sampler1, v_TexCoord);\n' +
-  ' gl_FragColor = color0*color1;\n'+
-  '}\n'; 
+  '  gl_FragColor = texture2D(u_Sampler, v_TexCoord);\n' +
+  '}\n';
 
 function main() {
+  // Retrieve <canvas> element
   var canvas = document.getElementById('webgl');
+
+  // Get the rendering context for WebGL
   var gl = getWebGLContext(canvas);
   if (!gl) {
     console.log('Failed to get the rendering context for WebGL');
     return;
   }
+
+  // Initialize shaders
   if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
     console.log('Failed to intialize shaders.');
     return;
   }
 
+  // Set the vertex information
   var n = initVertexBuffers(gl);
   if (n < 0) {
     console.log('Failed to set the vertex information');
     return;
   }
+
+  // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
   // Set texture
@@ -47,10 +57,10 @@ function main() {
 function initVertexBuffers(gl) {
   var verticesTexCoords = new Float32Array([
     // Vertex coordinates, texture coordinate
-    -0.5,  0.5,   0.0,1.0,
-    -0.5, -0.5,   0.0,0.0,
-     0.5,  0.5,   1.0,1.0,
-     0.5, -0.5,   1.0,0.0,
+    -0.5,  0.5,   0.0, 1.0,
+    -0.5, -0.5,   0.0, 0.0,
+     0.5,  0.5,   1.0, 1.0,
+     0.5, -0.5,   1.0, 0.0,
   ]);
   var n = 4; // The number of vertices
 
@@ -89,65 +99,47 @@ function initVertexBuffers(gl) {
 }
 
 function initTextures(gl, n) {
-  var texture0 = gl.createTexture();   // Create a texture object
-  var texture1 = gl.createTexture();
-  // if (!texture) {
-  //   console.log('Failed to create the texture object');
-  //   return false;
-  // }
+  var texture = gl.createTexture();   // Create a texture object
+  if (!texture) {
+    console.log('Failed to create the texture object');
+    return false;
+  }
 
   // Get the storage location of u_Sampler
-  var u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0');
-  var u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
-  // if (!u_Sampler) {
-  //   console.log('Failed to get the storage location of u_Sampler');
-  //   return false;
-  // }
-  var image0 = new Image();  // Create the image object
-  var image1 = new Image();
-  // if (!image) {
-  //   console.log('Failed to create the image object');
-  //   return false;
-  // }
-  image0.onload = function(){ loadTexture(gl, n, texture0, u_Sampler0, image0, 0); };
-  image0.src = 'resources/sky.jpg';
-
-  image1.onload = function(){ loadTexture(gl,n,texture1, u_Sampler1, image1, 1); };
-  image1.src = 'resources/circle.gif';
+  var u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler');
+  if (!u_Sampler) {
+    console.log('Failed to get the storage location of u_Sampler');
+    return false;
+  }
+  var image = new Image();  // Create the image object
+  if (!image) {
+    console.log('Failed to create the image object');
+    return false;
+  }
+  // Register the event handler to be called on loading an image
+  image.onload = function(){ loadTexture(gl, n, texture, u_Sampler, image); };
+  // Tell the browser to load an image
+  image.src = '../resources/sky.jpg';
 
   return true;
 }
 
-var g_texUnit0=false, g_texUnit1=false;
-function loadTexture(gl, n, texture, u_Sampler, image, texUnit) {
+function loadTexture(gl, n, texture, u_Sampler, image) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
-
-  if (texUnit == 0){
-      gl.activeTexture(gl.TEXTURE0);
-      g_texUnit0 = true;
-  } else {
-      gl.activeTexture(gl.TEXTURE1);
-      g_texUnit1 = true;
-  }
+  // Enable texture unit0
+  gl.activeTexture(gl.TEXTURE0);
+  // Bind the texture object to the target
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
+  // Set the texture parameters
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-  gl.uniform1i(u_Sampler, texUnit);
-
+  // Set the texture image
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+  
+  // Set the texture unit 0 to the sampler
+  gl.uniform1i(u_Sampler, 0);
+  
   gl.clear(gl.COLOR_BUFFER_BIT);   // Clear <canvas>
-  if (g_texUnit0 && g_texUnit1){
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, n); // Draw the rectangle
-  }
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, n); // Draw the rectangle
 }
-
-
-
-
-
-
-
-
-
